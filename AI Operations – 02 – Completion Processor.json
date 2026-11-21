@@ -1,0 +1,485 @@
+{
+  "name": "AI Operations – 02 – Completion Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -400,
+        -48
+      ],
+      "id": "a4d4d467-61de-4d65-a401-d77403809665",
+      "name": "Completion Check Schedule"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -112,
+        -48
+      ],
+      "id": "558bbcff-4836-4e01-9aa1-eafb8a041b3f",
+      "name": "Read Employee Workbench",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst results = [];\n\nfor (const item of rows) {\n  const row = item.json;\n\n  if (String(row.Status || \"\").trim().toLowerCase() !== \"completed\") {\n    continue;\n  }\n\n  const taskId = String(row.Task_ID || \"\").trim();\n  const cycleId = String(row.Cycle_ID || \"\").trim();\n  const ticketId = String(row.Ticket_ID || \"\").trim();\n  const proof = String(row.Completion_Proof || \"\").trim();\n\n  if (!cycleId || !taskId) {\n    continue;\n  }\n\n  const isDailyWhatsApp = taskId === \"TSK001\";\n\n  if (isDailyWhatsApp && !proof) {\n    continue;\n  }\n\n  if (!isDailyWhatsApp && !ticketId) {\n    continue;\n  }\n\n  results.push({\n    json: {\n      ...row,\n      Verification_Status: \"Valid\",\n      Completion_ID: cycleId\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        -48
+      ],
+      "id": "4007c5b6-764e-4f12-bc8a-c7a2944202cf",
+      "name": "Validate Task Completion"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1791655619,
+          "mode": "list",
+          "cachedResultName": "Completion_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1791655619"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        176,
+        368
+      ],
+      "id": "367ed1ad-44fa-414b-a8de-dd58647a09ae",
+      "name": "Read Existing Completion Records",
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        640,
+        -32
+      ],
+      "id": "51a7ff4b-e1dd-463b-bf28-989d8d7a2ae6",
+      "name": "Combine Completion Data"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1791655619,
+          "mode": "list",
+          "cachedResultName": "Completion_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1791655619"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Completion_ID": "={{ $json.Completion_ID }}",
+            "Cycle_ID": "={{ $json.Cycle_ID }}",
+            "Task_ID": "={{ $json.Task_ID }}",
+            "Task_Name": "={{ $json.Task_Name }}",
+            "Assigned_To": "={{ $json.Assigned_To }}",
+            "Completed_By": "={{ $json.Completed_By }}",
+            "Completed_At": "={{ $json.Completed_At }}",
+            "Ticket_ID": "={{ $json.Ticket_ID }}",
+            "Completion_Proof": "={{ $json.Completion_Proof }}",
+            "Verification_Status": "={{ $json.Verification_Status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Completion_ID",
+              "displayName": "Completion_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cycle_ID",
+              "displayName": "Cycle_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_ID",
+              "displayName": "Task_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_Name",
+              "displayName": "Task_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Assigned_To",
+              "displayName": "Assigned_To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completed_By",
+              "displayName": "Completed_By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completed_At",
+              "displayName": "Completed_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ticket_ID",
+              "displayName": "Ticket_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completion_Proof",
+              "displayName": "Completion_Proof",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Verification_Status",
+              "displayName": "Verification_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1344,
+        -32
+      ],
+      "id": "171233d6-b70e-4139-b573-b06b6bc8ccb6",
+      "name": "Record Task Completion",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst validCompletions = $(\"Validate Task Completion\").all();\n\nconst existingRows = $(\"Read Existing Completion Records\").all();\n\nconst existingIds = new Set(\n  existingRows\n    .map(item => String(item.json.Completion_ID || \"\").trim())\n    .filter(id => id !== \"\")\n);\n\nconst newCompletions = validCompletions.filter(item => {\n  const completionId = String(\n    item.json.Completion_ID || \"\"\n  ).trim();\n\n  return completionId && !existingIds.has(completionId);\n});\n\nreturn newCompletions.map(item => ({\n  json: item.json\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -32
+      ],
+      "id": "478d1d3d-c3fa-4729-a4cc-c7006a9b8cf9",
+      "name": "Filter Duplicate Completions"
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 2 – Completion Processor**\n\n**Workflow Name:** AI Operations – 02 – Completion Processor\n\n**Purpose:** Validates employee task completions and records verified completion details while preventing duplicate records.\n\n**Trigger:** Every 2 minutes.\n\n**Data Source:** Google Sheets – Employee_Workbench and Completion_Log.\n\n**Output:** Validated task completion records in Completion_Log.",
+        "height": 240,
+        "width": 880,
+        "color": "#ECD251"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        -624
+      ],
+      "typeVersion": 1,
+      "id": "3e507bf7-d1ec-4dbd-9542-d439b43cf7a0",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## **Completion Check Schedule**\n\n**Purpose:** Starts the completion-check process automatically.\n\n**Trigger:** Every 2 minutes.\n\n**Action:** Checks for employee task updates.",
+        "height": 384,
+        "width": 256,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -464,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "721156cb-3400-45bd-8613-25f112660215",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Employee Workbench**\n\n**Purpose:** Retrieves employee task records from Google Sheets.\n\n**Data Source:** Employee_Workbench.\n\n**Action:** Reads task status and completion details.",
+        "height": 432,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "2606ba03-84b3-4ba0-ae83-98ce4a116963",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## **Validate Task Completion**\n\n**Purpose:** Checks whether employee tasks are completed correctly.\n\n**Validation:** Checks Completed status and required proof.\n\n**Action:** Accepts WhatsApp proof or Portal Ticket ID as required.",
+        "height": 416,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        112,
+        -304
+      ],
+      "typeVersion": 1,
+      "id": "41de1f7c-79de-4a8f-9667-4c29250fd210",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Existing Completion Records**\n\n**Purpose:** Retrieves previously recorded task completions.\n\n**Data Source:** Completion_Log.\n\n**Action:** Checks existing completion records to prevent duplicates.",
+        "height": 416,
+        "width": 256,
+        "color": "#EC79C2"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        112,
+        144
+      ],
+      "typeVersion": 1,
+      "id": "f7b0ff46-1d14-4dff-bc8b-c38a06e71b9f",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## **Combine Completion Data**\n\n**Purpose:** Combines validated completions with existing records.\n\n**Mode:** Append.\n\n**Action:** Prepares records for duplicate checking.",
+        "height": 400,
+        "width": 256,
+        "color": "#61BD73"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "458e0983-296c-48ac-ba43-8601ff7a4b92",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## **Filter Duplicate Completions**\n\n**Purpose:** Prevents duplicate completion entries.\n\n**Validation:** Checks existing Cycle_ID records.\n\n**Action:** Allows only new completion records.",
+        "height": 400,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        912,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "ec15f8be-2c85-42a6-b045-3dfb16a57b2f",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## **Record Task Completion**\n\n**Purpose:** Saves validated employee task completions.\n\n**Destination:** Google Sheets – Completion_Log.\n\n**Action:** Appends completion details and verification status.",
+        "height": 400,
+        "color": "#DA9595"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "c4fdda5a-8fce-49cc-9fa6-2e6c116331c1",
+      "name": "Sticky Note7"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Completion Check Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read Employee Workbench",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Employee Workbench": {
+      "main": [
+        [
+          {
+            "node": "Validate Task Completion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Completion Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Task Completion": {
+      "main": [
+        [
+          {
+            "node": "Combine Completion Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Completion Records": {
+      "main": [
+        [
+          {
+            "node": "Combine Completion Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Completion Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Duplicate Completions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Duplicate Completions": {
+      "main": [
+        [
+          {
+            "node": "Record Task Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c684700b-eae5-493c-930e-a61d6d3781aa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "wK0OmnCG8QUc3fqT",
+  "tags": []
+}

@@ -1,0 +1,870 @@
+{
+  "name": "AI Operations – 04 – Manager Acknowledgement Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -672,
+        -176
+      ],
+      "id": "6bbbd8a1-3659-4164-8bf5-dee00930c4f3",
+      "name": "Manager Acknowledgement Check Schedule"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        0,
+        -176
+      ],
+      "id": "59a69e7c-db55-44b0-afad-0acd2c216bb7",
+      "name": "Read Manager Acknowledgement Status",
+      "executeOnce": false,
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        336,
+        272
+      ],
+      "id": "65b32c4b-e768-46e2-a640-b449fa41f05f",
+      "name": "Read Manager Acknowledgement Records",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        816,
+        -160
+      ],
+      "id": "d58a55e2-bf75-45fd-b33f-e33ed91cae2a",
+      "name": "Combine Task and Acknowledgement Records"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = $(\"Read Manager Acknowledgement Status\").all();\nconst alerts = $(\"Read Manager Acknowledgement Records\").all();\n\nconst alertMap = new Map();\n\nfor (const item of alerts) {\n  const alert = item.json;\n  const cycleId = String(alert.Cycle_ID || \"\").trim();\n\n  if (cycleId) {\n    alertMap.set(cycleId, alert);\n  }\n}\n\nconst results = [];\n\nfor (const item of tasks) {\n  const task = item.json;\n  const cycleId = String(task.Cycle_ID || \"\").trim();\n\n  if (!cycleId) continue;\n\n  const alert = alertMap.get(cycleId);\n\n  if (!alert) continue;\n\n  const acknowledged =\n    String(task.Manager_Acknowledged).toLowerCase() === \"true\";\n\n  const loggedAcknowledged =\n    String(alert.Manager_Acknowledged).toLowerCase() === \"true\";\n\n  if (acknowledged && !loggedAcknowledged) {\n    results.push({\n      json: {\n        Alert_ID: alert.Alert_ID,\n        Cycle_ID: cycleId,\n        Task_ID: task.Task_ID,\n        Employee: task.Assigned_To,\n        Manager_Email: alert.Manager_Email,\n        Manager_Acknowledged: true,\n        Manager_Acknowledged_At:\n          task.Manager_Acknowledged_At || \"\",\n        Alert_Status: \"ACKNOWLEDGED\"\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        -160
+      ],
+      "id": "05b4658b-7209-4e21-97df-476be8ea42ab",
+      "name": "Identify Manager Acknowledgements"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Manager_Acknowledged": "TRUE",
+            "Manager_Acknowledged_At": "={{ $json.Manager_Acknowledged_At }}",
+            "Alert_Status": "ACKNOWLEDGED",
+            "Alert_ID": "={{ $json.Alert_ID }}"
+          },
+          "matchingColumns": [
+            "Alert_ID"
+          ],
+          "schema": [
+            {
+              "id": "Alert_ID",
+              "displayName": "Alert_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Cycle_ID",
+              "displayName": "Cycle_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_ID",
+              "displayName": "Task_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Employee",
+              "displayName": "Employee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Email",
+              "displayName": "Manager_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Type",
+              "displayName": "Alert_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Sent_At",
+              "displayName": "Alert_Sent_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged",
+              "displayName": "Manager_Acknowledged",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged_At",
+              "displayName": "Manager_Acknowledged_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Email",
+              "displayName": "Leadership_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated",
+              "displayName": "Leadership_Escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated_At",
+              "displayName": "Leadership_Escalated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Status",
+              "displayName": "Alert_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1808,
+        -160
+      ],
+      "id": "2ed87296-bb90-4bb1-97c7-1ccb0bb4fc44",
+      "name": "Update Manager Acknowledgement Log",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst alerts = $(\"Read Manager Acknowledgement Records\").all();\nconst tasks = $(\"Read Manager Acknowledgement Status\").all();\n\nconst taskMap = new Map();\n\nfor (const item of tasks) {\n  const task = item.json;\n  const cycleId = String(task.Cycle_ID || \"\").trim();\n\n  if (cycleId) {\n    taskMap.set(cycleId, task);\n  }\n}\n\nconst now = new Date();\nconst results = [];\n\nfor (const item of alerts) {\n  const alert = item.json;\n  const cycleId = String(alert.Cycle_ID || \"\").trim();\n\n  // Ignore empty placeholder records\n  if (!cycleId || !alert.Alert_ID) continue;\n\n  // Skip acknowledged or already escalated alerts\n  if (\n    String(alert.Manager_Acknowledged).toLowerCase() === \"true\" ||\n    String(alert.Leadership_Escalated).toLowerCase() === \"true\"\n  ) {\n    continue;\n  }\n\n  if (String(alert.Alert_Status).toUpperCase() !== \"SENT\") {\n    continue;\n  }\n\n  // Find the matching employee task\n  const task = taskMap.get(cycleId);\n\n  // Only pending tasks can be escalated\n  if (\n    !task ||\n    String(task.Status || \"\").trim().toLowerCase() !== \"pending\"\n  ) {\n    continue;\n  }\n\n  const sentAt = new Date(\n    String(alert.Alert_Sent_At).replace(\" \", \"T\") + \"+05:30\"\n  );\n\n  if (isNaN(sentAt.getTime())) continue;\n\n  const hoursElapsed =\n    (now.getTime() - sentAt.getTime()) / 3600000;\n\n  results.push({\n    json: {\n      ...alert,\n      Hours_Since_Alert: Number(hoursElapsed.toFixed(2)),\n      Manager_Acknowledgement_Overdue: hoursElapsed >= 2,\n      Leadership_Escalation_Due: hoursElapsed >= 4\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        272
+      ],
+      "id": "0f333a23-91bd-415d-ab06-7ae455c5f658",
+      "name": "Identify Unacknowledged Manager Alerts",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerts = $input.all();\n\nconst results = alerts.filter(item => {\n  const alert = item.json;\n\n  return (\n    alert.Leadership_Escalation_Due === true &&\n    String(alert.Leadership_Escalated).toLowerCase() !== \"true\"\n  );\n});\n\nreturn results.map(item => ({\n  json: {\n    ...item.json,\n    Leadership_Escalation_Type: \"UNACKNOWLEDGED_MANAGER\",\n    Escalation_Reason: \"Manager failed to acknowledge within 4 hours\"\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        272
+      ],
+      "id": "4a965e58-b093-4815-90b2-5bb94faaa89d",
+      "name": "Filter Tasks for Leadership Escalation",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Leadership_Email }}",
+        "subject": "=Leadership Escalation – {{ $json.Task_ID }} – {{ $json.Employee }}",
+        "message": "=<p>Hello Leadership Team,</p>  <p>This is an automated escalation regarding an unresolved operational task.</p>  <table border=\"1\" cellpadding=\"8\" cellspacing=\"0\"> <tr><td><b>Task ID</b></td><td>{{ $json.Task_ID }}</td></tr> <tr><td><b>Task Name</b></td><td>{{ $json.Task_Name }}</td></tr> <tr><td><b>Employee</b></td><td>{{ $json.Employee }}</td></tr> <tr><td><b>Manager Email</b></td><td>{{ $json.Manager_Email }}</td></tr> <tr><td><b>Alert Sent At</b></td><td>{{ $json.Alert_Sent_At }}</td></tr> <tr><td><b>Cycle ID</b></td><td>{{ $json.Cycle_ID }}</td></tr> </table>  <p>The manager has not acknowledged the overdue alert within the 4-hour SLA.</p>  <p>Please review and take appropriate action.</p>  <p>Regards,<br>Allo Innoware – AI Operations Manager</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1984,
+        272
+      ],
+      "id": "a35d210c-a759-4785-bb68-d12459530419",
+      "name": "Send Leadership Escalation Email",
+      "webhookId": "3241f8f2-bcb0-46f9-a1fb-1ba1a5e0d065",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ERGgythLSAbgCz1y",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Alert_ID": "={{ $(\"Filter Tasks for Leadership Escalation\").item.json.Alert_ID }}",
+            "Leadership_Escalated": "TRUE",
+            "Leadership_Escalated_At": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd HH:mm:ss') }}",
+            "Alert_Status": "LEADERSHIP_ESCALATED"
+          },
+          "matchingColumns": [
+            "Alert_ID"
+          ],
+          "schema": [
+            {
+              "id": "Alert_ID",
+              "displayName": "Alert_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Cycle_ID",
+              "displayName": "Cycle_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_ID",
+              "displayName": "Task_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Employee",
+              "displayName": "Employee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Email",
+              "displayName": "Manager_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Type",
+              "displayName": "Alert_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Sent_At",
+              "displayName": "Alert_Sent_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged",
+              "displayName": "Manager_Acknowledged",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged_At",
+              "displayName": "Manager_Acknowledged_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Email",
+              "displayName": "Leadership_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated",
+              "displayName": "Leadership_Escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated_At",
+              "displayName": "Leadership_Escalated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Status",
+              "displayName": "Alert_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2560,
+        272
+      ],
+      "id": "5e3667cd-1e0c-410a-9225-f7191a97529b",
+      "name": "Record Leadership Escalation",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Task_Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -320,
+        -176
+      ],
+      "id": "8795d32a-dd4c-4385-aa87-57d610412df6",
+      "name": "Read Task Master for Leadership Details",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 4 – Manager Acknowledgement Tracker**\n\n**Workflow Name:** AI Operations – 04 – Manager Acknowledgement Tracker\n\n**Purpose:** Tracks manager acknowledgements for overdue task alerts and automatically escalates unresolved alerts to leadership when the acknowledgement SLA is exceeded.\n\n**Trigger:** Every 5 minutes.\n\n**Data Source:** Google Sheets – Employee_Workbench and Escalation_Log.\n\n**Output:** Updated manager acknowledgement records and leadership escalation notifications in Escalation_Log.",
+        "height": 256,
+        "width": 1264,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        592,
+        -992
+      ],
+      "typeVersion": 1,
+      "id": "e06c9795-0b9b-4561-98cb-ca4c4c26a077",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Task Master Details**\n\n**Purpose:** Retrieves task master for Leadership Details .\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Action:** Reads task status and manager acknowledgement status.",
+        "height": 400,
+        "width": 272,
+        "color": "#D68F8F"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -400,
+        -400
+      ],
+      "typeVersion": 1,
+      "id": "1b18d0d4-23d0-423c-bafa-d4114877dea5",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## **Manager Acknowledgement Check Schedule**\n\n**Purpose:** Starts automatic manager acknowledgement monitoring.\n\n**Trigger:** Every 5 minutes.\n\n**Action:** Checks for manager acknowledgement updates.",
+        "height": 416,
+        "width": 288,
+        "color": "#B6FB88"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -736,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "58abfa9c-4d69-49b1-83ec-7ebcfe859748",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Manager Acknowledgement Status**\n\n**Purpose:** Retrieves employee task and acknowledgement details.\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Action:** Reads task status and manager acknowledgement status.",
+        "height": 448,
+        "width": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -448
+      ],
+      "typeVersion": 1,
+      "id": "64cffe2a-ac17-4829-aa72-3963e6937c87",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Manager Acknowledgement Records**\n\n**Purpose:** Retrieves previously sent manager alerts.\n\n**Data Source:** Google Sheets – Escalation_Log.\n\n**Action:** Reads alert and escalation details.",
+        "height": 448,
+        "width": 336,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        272,
+        16
+      ],
+      "typeVersion": 1,
+      "id": "38076ebc-5d86-45b9-a348-6e9d5470811e",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## **Combine Task and Acknowledgement Records**\n\n**Purpose:** Combines employee task records with existing alert records.\n\n**Mode:** Append.\n\n**Action:** Prepares data for acknowledgement tracking.",
+        "height": 480,
+        "width": 384,
+        "color": "#A5EEE2"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        656,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "bc36b0a5-f04c-4bd9-9789-51294f999c3e",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## **Identify Manager Acknowledgements**\n\n**Purpose:** Detects newly acknowledged manager alerts.\n\n**Condition:** Checks Manager_Acknowledged status in Employee_Workbench.\n\n**Action:** Identifies alerts that need acknowledgement records updated.",
+        "height": 464,
+        "width": 336,
+        "color": "#F89191"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1152,
+        -400
+      ],
+      "typeVersion": 1,
+      "id": "34fdcc5e-c099-4123-8146-244be09d2d3d",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## **Update Manager Acknowledgement Log**\n\n**Purpose:** Updates manager acknowledgement details.\n\n**Destination:** Google Sheets – Escalation_Log.\n\n**Action:** Records acknowledgement status and timestamp using Alert_ID.",
+        "height": 432,
+        "width": 448,
+        "color": "#CAE6A7"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1616,
+        -368
+      ],
+      "typeVersion": 1,
+      "id": "c0a39d71-745b-4ce9-9771-a7c3ab0fdf81",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "## **Identify Unacknowledged Manager Alerts**\n\n**Purpose:** Finds manager alerts that have not been acknowledged.\n\n**Validation:** Checks alert status and confirms the task is still Pending.\n\n**Action:** Calculates elapsed time since the manager alert was sent.",
+        "height": 352,
+        "width": 496,
+        "color": "#B6ECD0"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        688,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "82fdf7aa-a610-40b2-b6e4-a26e04007cbc",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## **Filter Tasks for Leadership Escalation**\n\n**Purpose:** Identifies alerts that qualify for leadership escalation.\n\n**Condition:** Manager acknowledgement is pending beyond 4 hours.\n\n**Action:** Excludes already escalated alerts.",
+        "height": 352,
+        "width": 480,
+        "color": "#DAE79D"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1264,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "670ca149-e1ae-487e-8bc5-d2ed7a1136ed",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "## **Send Leadership Escalation Email**\n\n**Purpose:** Notifies leadership about unresolved manager alerts.\n\n**Action:** Sends an escalation email using Gmail.\n\n**Recipient:** Assigned Leadership_Email.",
+        "height": 352,
+        "width": 480,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1808,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "419323a8-f0d7-4894-b356-9334783ad50a",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "## **Record Leadership Escalation**\n\n**Purpose:** Stores leadership escalation details.\n\n**Destination:** Google Sheets – Escalation_Log.\n\n**Action:** Updates escalation status and timestamp using Alert_ID.",
+        "height": 352,
+        "width": 480,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2352,
+        112
+      ],
+      "typeVersion": 1,
+      "id": "30da2c9f-4708-40f1-a712-74fec94a5985",
+      "name": "Sticky Note11"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manager Acknowledgement Check Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read Task Master for Leadership Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Manager Acknowledgement Status": {
+      "main": [
+        [
+          {
+            "node": "Combine Task and Acknowledgement Records",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Manager Acknowledgement Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Manager Acknowledgement Records": {
+      "main": [
+        [
+          {
+            "node": "Combine Task and Acknowledgement Records",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Identify Unacknowledged Manager Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Task and Acknowledgement Records": {
+      "main": [
+        [
+          {
+            "node": "Identify Manager Acknowledgements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Manager Acknowledgements": {
+      "main": [
+        [
+          {
+            "node": "Update Manager Acknowledgement Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Manager Acknowledgement Log": {
+      "main": [
+        []
+      ]
+    },
+    "Identify Unacknowledged Manager Alerts": {
+      "main": [
+        [
+          {
+            "node": "Filter Tasks for Leadership Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Tasks for Leadership Escalation": {
+      "main": [
+        [
+          {
+            "node": "Send Leadership Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Leadership Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "Record Leadership Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Task Master for Leadership Details": {
+      "main": [
+        [
+          {
+            "node": "Read Manager Acknowledgement Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7b23dc19-ba3b-45a1-b1a5-a5deafcf2e4a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "yGn7qoVmRISumHqV",
+  "tags": []
+}

@@ -1,0 +1,664 @@
+{
+  "name": "AI Operations – 03 – SLA Monitor & Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -576,
+        -176
+      ],
+      "id": "a2bde20c-e266-49aa-8cd2-18df33c3fa10",
+      "name": "SLA Monitoring Schedule"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -240,
+        -176
+      ],
+      "id": "e54b6bf9-7b5f-49b1-8fd8-a58c9e0940c1",
+      "name": "Read SLA Task Records",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = $input.all();\nconst now = new Date();\n\nconst MANAGER_ALERT_DELAY_MINUTES = 15;\n\nconst overdueTasks = [];\n\nfor (const item of tasks) {\n  const task = item.json;\n\n  if (\n    String(task.Status || \"\").trim().toLowerCase() !== \"pending\"\n  ) {\n    continue;\n  }\n\n  const dueDateTime = new Date(\n    `${task.Due_Date}T${task.Due_Time}:00+05:30`\n  );\n\n  if (isNaN(dueDateTime.getTime())) {\n    continue;\n  }\n\n  const alertTime = new Date(\n    dueDateTime.getTime() +\n    MANAGER_ALERT_DELAY_MINUTES * 60 * 1000\n  );\n\n  if (now >= alertTime) {\n    overdueTasks.push({\n      json: {\n        ...task,\n        Alert_Type: \"OVERDUE\",\n        Overdue_Detected_At: now.toISOString()\n      }\n    });\n  }\n}\n\nreturn overdueTasks;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -176
+      ],
+      "id": "6da16dcf-5b93-4cac-8aaa-7512e962a18f",
+      "name": "Identify Overdue Tasks"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        112,
+        208
+      ],
+      "id": "9ddf520b-343b-40df-8fac-162e3240b8b6",
+      "name": "Read Existing Escalation Records",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        432,
+        -160
+      ],
+      "id": "d2a61f44-5d5c-492a-b4d7-d0dcd425361d",
+      "name": "Combine Overdue and Escalation Records"
+    },
+    {
+      "parameters": {
+        "jsCode": "const overdueTasks = $(\"Identify Overdue Tasks\").all();\nconst existingAlerts = $(\"Read Existing Escalation Records\").all();\n\nconst existingAlertIds = new Set(\n  existingAlerts\n    .map(item => String(item.json.Alert_ID || \"\").trim())\n    .filter(Boolean)\n);\n\nconst newAlerts = overdueTasks.filter(item => {\n  const cycleId = String(item.json.Cycle_ID || \"\").trim();\n  const alertId = `${cycleId}-MANAGER_OVERDUE`;\n\n  return cycleId && !existingAlertIds.has(alertId);\n});\n\nreturn newAlerts.map(item => ({\n  json: {\n    ...item.json,\n    Alert_ID: `${item.json.Cycle_ID}-MANAGER_OVERDUE`,\n    Alert_Type: \"MANAGER_OVERDUE\"\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -160
+      ],
+      "id": "1c601814-d198-4a49-a857-a053f369a099",
+      "name": "Filter New Manager Alerts"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Task_Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1184,
+        -160
+      ],
+      "id": "f67d092f-236f-46c6-ac56-739a6a44cbf9",
+      "name": "Read Task Master for Alert Recipients",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const overdueTasks = $(\"Filter New Manager Alerts\").all();\nconst masterTasks = $(\"Read Task Master for Alert Recipients\").all();\n\nconst taskMasterMap = new Map(\n  masterTasks.map(item => [\n    String(item.json.Task_ID).trim(),\n    item.json\n  ])\n);\n\nreturn overdueTasks.map(item => {\n  const task = item.json;\n  const master = taskMasterMap.get(\n    String(task.Task_ID).trim()\n  );\n\n  if (!master) {\n    return null;\n  }\n\n  return {\n    json: {\n      ...task,\n      Manager_Email: master.Manager_Email,\n      Leadership_Email: master.Leadership_Email\n    }\n  };\n}).filter(Boolean);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -160
+      ],
+      "id": "27208da5-cd0a-4180-91b5-6652e9946e91",
+      "name": "Match Overdue Tasks with Recipients"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.Manager_Email }}",
+        "subject": "=Overdue Task Alert – {{ $json.Task_ID }} – {{ $json.Assigned_To }}",
+        "message": "=<p>Hello Manager,</p>  <p>The following operational task is overdue and requires your attention.</p>  <table border=\"1\" cellpadding=\"8\" cellspacing=\"0\"> <tr><td><b>Task ID</b></td><td>{{ $json.Task_ID }}</td></tr> <tr><td><b>Task Name</b></td><td>{{ $json.Task_Name }}</td></tr> <tr><td><b>Assigned Employee</b></td><td>{{ $json.Assigned_To }}</td></tr> <tr><td><b>Cycle ID</b></td><td>{{ $json.Cycle_ID }}</td></tr> <tr><td><b>Due Date</b></td><td>{{ $json.Due_Date }}</td></tr> <tr><td><b>Due Time</b></td><td>{{ $json.Due_Time }}</td></tr> </table>  <p>Please review the task and acknowledge the escalation.</p>  <p>Regards,<br>Allo Innoware – AI Operations Manager</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        -160
+      ],
+      "id": "d1627ac8-8403-49aa-b765-b7e41b430e98",
+      "name": "Send Manager Overdue Alert",
+      "webhookId": "39f72b11-8b0d-4655-8a2d-03d7753db1e3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ERGgythLSAbgCz1y",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Alert_ID": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Alert_ID }}",
+            "Cycle_ID": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Cycle_ID }}",
+            "Task_ID": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Task_ID }}",
+            "Employee": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Assigned_To }}",
+            "Manager_Email": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Manager_Email }}",
+            "Alert_Type": "MANAGER_OVERDUE",
+            "Alert_Sent_At": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd HH:mm:ss') }}",
+            "Manager_Acknowledged": "FALSE",
+            "Leadership_Email": "={{ $(\"Match Overdue Tasks with Recipients\").item.json.Leadership_Email }}",
+            "Leadership_Escalated": "FALSE",
+            "Alert_Status": "SENT"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Alert_ID",
+              "displayName": "Alert_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cycle_ID",
+              "displayName": "Cycle_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_ID",
+              "displayName": "Task_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Employee",
+              "displayName": "Employee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Email",
+              "displayName": "Manager_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Type",
+              "displayName": "Alert_Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Sent_At",
+              "displayName": "Alert_Sent_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged",
+              "displayName": "Manager_Acknowledged",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged_At",
+              "displayName": "Manager_Acknowledged_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Email",
+              "displayName": "Leadership_Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated",
+              "displayName": "Leadership_Escalated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Leadership_Escalated_At",
+              "displayName": "Leadership_Escalated_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Alert_Status",
+              "displayName": "Alert_Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2288,
+        -160
+      ],
+      "id": "146f3944-7978-4809-bd20-8632765733e1",
+      "name": "Record Manager Escalation",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 3 – SLA Monitor & Escalation**\n\n**Workflow Name:** AI Operations – 03 – SLA Monitor & Escalation\n\n**Purpose:** Monitors employee task deadlines, identifies overdue tasks, and automatically sends manager alerts while preventing duplicate notifications.\n\n**Trigger:** Every 15 minutes.\n\n**Data Source:** Google Sheets – Employee_Workbench, Task_Master, and Escalation_Log.\n\n**Output:** Manager overdue email alerts and escalation records in Escalation_Log.",
+        "height": 240,
+        "width": 880,
+        "color": "#B59797"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        592,
+        -864
+      ],
+      "typeVersion": 1,
+      "id": "9714a9dc-d814-4c42-af69-c8d9f447149d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## **SLA Monitoring Schedule**\n\n**Purpose:** Starts automatic SLA monitoring.\n\n**Trigger:** Every 15 minutes.\n\n**Action:** Checks task deadlines and overdue status.",
+        "height": 352,
+        "color": "#95C2CB"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -640,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "fa9158f3-049a-4871-a1a6-92d9ea9aa02a",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## **Read SLA Task Records**\n\n**Purpose:** Retrieves employee task records.\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Action:** Reads task status, due date, and due time.",
+        "height": 400,
+        "color": "#92D393"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -304,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "95707756-f241-482e-b28b-a2c9de4cf76b",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## **Identify Overdue Tasks**\n\n**Purpose:** Identifies tasks that have exceeded their deadlines.\n\n**Condition:** Task status is Pending.\n\n**SLA:** Due time + 15-minute alert delay.\n\n**Output:** List of overdue tasks.",
+        "height": 416,
+        "color": "#C5A6A6"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "13005d2f-ef4f-4c74-92b2-36560c2d9d69",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## **Combine Overdue and Escalation Records**\n\n**Purpose:** Combines overdue tasks with existing alert records.\n\n**Mode:** Append.\n\n**Action:** Prepares records for duplicate alert checking.",
+        "height": 400,
+        "width": 288,
+        "color": "#BDB775"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        336,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "564c5adc-c86c-48df-a37e-c5dd17da9065",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Existing Escalation Records**\n\n**Purpose:** Retrieves previously sent alerts.\n\n**Data Source:** Google Sheets – Escalation_Log.\n\n**Action:** Checks existing manager alert records.",
+        "height": 352,
+        "width": 304,
+        "color": "#D05858"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        16
+      ],
+      "typeVersion": 1,
+      "id": "b1d04ead-104d-40c6-96a9-48e82bb09682",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## **Filter New Manager Alerts**\n\n**Purpose:** Prevents duplicate manager notifications.\n\n**Validation:** Checks existing Alert_ID values.\n\n**Action:** Allows only tasks without a previous manager alert.",
+        "height": 384,
+        "width": 288,
+        "color": "#9DDDBF"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        736,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "327a51d0-e809-4abf-a5ff-3e43bd6be231",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Task Master for Alert Recipients**\n\n**Purpose:** Retrieves notification recipient details.\n\n**Data Source:** Google Sheets – Task_Master.\n\n**Action:** Reads manager and leadership email addresses.",
+        "height": 448,
+        "width": 288,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1088,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "38c7b23a-2eb0-421b-82f1-2db231a46c1b",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "## **Match Overdue Tasks with Recipients**\n\n**Purpose:** Matches overdue tasks with the correct recipients.\n\n**Validation:** Matches records using Task_ID.\n\n**Output:** Overdue task details with manager and leadership emails.",
+        "height": 416,
+        "width": 304
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1440,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "30caa190-1010-4f97-878f-229d1d9cac4b",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## **Send Manager Overdue Alert**\n\n**Purpose:** Notifies the manager about overdue tasks.\n\n**Action:** Sends an email using Gmail.\n\n**Recipient:** Assigned Manager_Email.\n\n**Content:** Employee, task name, and overdue details.",
+        "height": 432,
+        "width": 304,
+        "color": "#78A191"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1808,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "4836e0d2-3d05-4171-979a-da86b258246f",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "## **Record Manager Escalation**\n\n**Purpose:** Stores manager alert details.\n\n**Destination:** Google Sheets – Escalation_Log.\n\n**Action:** Records Alert_ID, sent time, and alert status.\n\n**Initial Status:** SENT.",
+        "height": 464,
+        "width": 272,
+        "color": "#7AAF46"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2192,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "19aee650-c0f9-40e3-bc5c-707183abf762",
+      "name": "Sticky Note10"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SLA Monitoring Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read SLA Task Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read SLA Task Records": {
+      "main": [
+        [
+          {
+            "node": "Identify Overdue Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Escalation Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Overdue Tasks": {
+      "main": [
+        [
+          {
+            "node": "Combine Overdue and Escalation Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Escalation Records": {
+      "main": [
+        [
+          {
+            "node": "Combine Overdue and Escalation Records",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Overdue and Escalation Records": {
+      "main": [
+        [
+          {
+            "node": "Filter New Manager Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Manager Alerts": {
+      "main": [
+        [
+          {
+            "node": "Read Task Master for Alert Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Task Master for Alert Recipients": {
+      "main": [
+        [
+          {
+            "node": "Match Overdue Tasks with Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Overdue Tasks with Recipients": {
+      "main": [
+        [
+          {
+            "node": "Send Manager Overdue Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Manager Overdue Alert": {
+      "main": [
+        [
+          {
+            "node": "Record Manager Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c4682734-81bc-4cd2-a296-39614caa2363",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "b0f95F2UCqgXclXm",
+  "tags": []
+}

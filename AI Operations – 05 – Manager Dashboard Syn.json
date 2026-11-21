@@ -1,0 +1,316 @@
+{
+  "name": "AI Operations – 05 – Manager Dashboard Syn",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -400,
+        -96
+      ],
+      "id": "5734fd55-70e5-4002-ae10-341c18fe7f0b",
+      "name": "Manager Dashboard Schedule"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -80,
+        -96
+      ],
+      "id": "48e5ead3-32fa-45e2-bedf-87e6820ef8f2",
+      "name": "Read Employee Workbench Records",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = $input.all();\nconst now = new Date();\n\nconst employees = {};\n\nfor (const item of tasks) {\n  const task = item.json;\n\n  const employee = String(task.Assigned_To || \"\").trim();\n  if (!employee) continue;\n\n  if (!employees[employee]) {\n    employees[employee] = {\n      Employee: employee,\n      Total_Tasks: 0,\n      Pending_Tasks: 0,\n      Overdue_Tasks: 0,\n      Completed_Tasks: 0,\n      Last_Completion: \"\",\n      Manager_Action_Required: false\n    };\n  }\n\n  const stats = employees[employee];\n\n  stats.Total_Tasks++;\n\n  const status = String(task.Status || \"\")\n    .trim()\n    .toLowerCase();\n\n  if (status === \"completed\") {\n    stats.Completed_Tasks++;\n\n    const completedAt = String(task.Completed_At || \"\");\n\n    if (\n      completedAt &&\n      (!stats.Last_Completion ||\n       completedAt > stats.Last_Completion)\n    ) {\n      stats.Last_Completion = completedAt;\n    }\n  } else if (status === \"pending\") {\n    stats.Pending_Tasks++;\n\n    const dueDateTime = new Date(\n      `${task.Due_Date}T${task.Due_Time}:00+05:30`\n    );\n\n    if (!isNaN(dueDateTime.getTime()) &&\n        now > dueDateTime) {\n      stats.Overdue_Tasks++;\n    }\n  }\n\n  if (\n    status === \"pending\" &&\n    String(task.Manager_Acknowledged).toLowerCase() !== \"true\" &&\n    stats.Overdue_Tasks > 0\n  ) {\n    stats.Manager_Action_Required = true;\n  }\n}\n\nreturn Object.values(employees).map(employee => ({\n  json: employee\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -96
+      ],
+      "id": "5099de1a-19a0-4cac-a7e8-1215ec19aba2",
+      "name": "Calculate Employee Dashboard Metrics"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1285945151,
+          "mode": "list",
+          "cachedResultName": "Manager_Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1285945151"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Employee": "={{ $json.Employee }}",
+            "Total_Tasks": "={{ $json.Total_Tasks }}",
+            "Pending_Tasks": "={{ $json.Pending_Tasks }}",
+            "Overdue_Tasks": "={{ $json.Overdue_Tasks }}",
+            "Completed_Tasks": "={{ $json.Completed_Tasks }}",
+            "Last_Completion": "={{ $json.Last_Completion }}",
+            "Manager_Action_Required": "={{ $json.Manager_Action_Required }}"
+          },
+          "matchingColumns": [
+            "Employee"
+          ],
+          "schema": [
+            {
+              "id": "Employee",
+              "displayName": "Employee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total_Tasks",
+              "displayName": "Total_Tasks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pending_Tasks",
+              "displayName": "Pending_Tasks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Overdue_Tasks",
+              "displayName": "Overdue_Tasks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completed_Tasks",
+              "displayName": "Completed_Tasks",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last_Completion",
+              "displayName": "Last_Completion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Action_Required",
+              "displayName": "Manager_Action_Required",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        752,
+        -96
+      ],
+      "id": "c699ea0b-2722-49e7-b1ca-072c0133c2c5",
+      "name": "Update Manager Dashboard Records",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## **Manager Dashboard Schedule**\n\n**Purpose:** Starts automatic dashboard synchronization.\n\n**Trigger:** Every 5 minutes.\n\n**Action:** Refreshes employee task performance metrics.",
+        "height": 400,
+        "width": 304,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -496,
+        -320
+      ],
+      "typeVersion": 1,
+      "id": "952100f2-4322-47cf-8052-9772a67965ae",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Employee Workbench Records**\n\n**Purpose:** Retrieves employee task-cycle records.\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Action:** Reads task status, due dates, and completion details.",
+        "height": 400,
+        "width": 304,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -144,
+        -320
+      ],
+      "typeVersion": 1,
+      "id": "37aba585-e240-4833-9ed1-5abb76430b38",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## **Calculate Employee Dashboard Metrics**\n\n**Purpose:** Calculates employee task performance.\n\n**Metrics:** Total, Pending, Overdue, and Completed tasks.\n\n**Action:** Calculates last completion time and manager action status.",
+        "height": 400,
+        "width": 304,
+        "color": "#C47E7E"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        -320
+      ],
+      "typeVersion": 1,
+      "id": "eae5b2a7-5b39-4ed0-9cc7-56561c2fda8e",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## **Update Manager Dashboard Records**\n\n**Purpose:** Updates the manager's performance dashboard.\n\n**Destination:** Google Sheets – Manager_Dashboard.\n\n**Action:** Saves the latest employee task metrics.",
+        "height": 416,
+        "width": 368,
+        "color": "#7B82E5"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        624,
+        -320
+      ],
+      "typeVersion": 1,
+      "id": "d20a364b-64f4-41a5-87de-6383b8b81b70",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 5 – Manager Dashboard Sync**\n\n**Workflow Name:** AI Operations – 05 – Manager Dashboard Sync\n\n**Purpose:** Automatically calculates employee task performance metrics, including total, pending, overdue, and completed tasks, and updates the manager dashboard.\n\n**Trigger:** Every 5 minutes.\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Output:** Updated employee performance metrics in Manager_Dashboard.",
+        "height": 272,
+        "width": 656,
+        "color": "#2C1A56"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -720
+      ],
+      "typeVersion": 1,
+      "id": "5a8bcd55-8056-4361-97ae-a209606f1490",
+      "name": "Sticky Note4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manager Dashboard Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read Employee Workbench Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Employee Workbench Records": {
+      "main": [
+        [
+          {
+            "node": "Calculate Employee Dashboard Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Employee Dashboard Metrics": {
+      "main": [
+        [
+          {
+            "node": "Update Manager Dashboard Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "572dd5b7-2a50-4a84-ac72-3e76e28fe07c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "8nu3Q16nCzushejA",
+  "tags": []
+}

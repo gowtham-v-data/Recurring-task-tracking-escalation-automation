@@ -1,0 +1,459 @@
+{
+  "name": "AI Operations – 06 – Operational Integrity Audit",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -416,
+        -192
+      ],
+      "id": "9f833acd-3e2e-401e-b19e-0a22c821845c",
+      "name": "Daily Integrity Audit Schedule"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -80,
+        -192
+      ],
+      "id": "885446e9-dd1e-4167-baf2-3ee87b7c1a24",
+      "name": "Read Task Cycles for Integrity Audit",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = $input.all();\n\nconst seen = new Map();\nconst duplicates = [];\n\nfor (const item of records) {\n  const cycleId = String(item.json.Cycle_ID || \"\").trim();\n\n  if (!cycleId) {\n    duplicates.push({\n      json: {\n        Issue_Type: \"MISSING_CYCLE_ID\",\n        Task_ID: item.json.Task_ID || \"\",\n        Employee: item.json.Assigned_To || \"\",\n        Details: \"Task record has no Cycle_ID\"\n      }\n    });\n    continue;\n  }\n\n  if (seen.has(cycleId)) {\n    duplicates.push({\n      json: {\n        Issue_Type: \"DUPLICATE_TASK_CYCLE\",\n        Cycle_ID: cycleId,\n        Task_ID: item.json.Task_ID || \"\",\n        Employee: item.json.Assigned_To || \"\",\n        Details: \"This Cycle_ID appears more than once\"\n      }\n    });\n  } else {\n    seen.set(cycleId, true);\n  }\n}\n\nreturn duplicates;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -192
+      ],
+      "id": "69d8e709-2af6-47b2-91ea-ae4cbc0910c8",
+      "name": "Detect Duplicate Task Cycles",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1791655619,
+          "mode": "list",
+          "cachedResultName": "Completion_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1791655619"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        -192
+      ],
+      "id": "e93d06f4-ba6d-4c64-b344-0a4c303fed58",
+      "name": "Read Completion Records for Audit",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = $input.all();\n\nconst seen = new Set();\nconst issues = [];\n\nfor (const item of records) {\n  const record = item.json;\n\n  const completionId = String(\n    record.Completion_ID || \"\"\n  ).trim();\n\n  const cycleId = String(\n    record.Cycle_ID || \"\"\n  ).trim();\n\n  if (!completionId || !cycleId) {\n    issues.push({\n      json: {\n        Issue_Type: \"MISSING_COMPLETION_REFERENCE\",\n        Cycle_ID: cycleId,\n        Details: \"Completion_ID or Cycle_ID is missing\"\n      }\n    });\n    continue;\n  }\n\n  if (seen.has(cycleId)) {\n    issues.push({\n      json: {\n        Issue_Type: \"DUPLICATE_COMPLETION\",\n        Completion_ID: completionId,\n        Cycle_ID: cycleId,\n        Task_ID: record.Task_ID,\n        Employee: record.Assigned_To,\n        Details: \"Multiple completion records exist for this cycle\"\n      }\n    });\n  } else {\n    seen.add(cycleId);\n  }\n}\n\nreturn issues;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "ed4dce52-969f-4868-9b04-4c81eb12ced0",
+      "name": "Detect Duplicate Completion Records",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1644593358,
+          "mode": "list",
+          "cachedResultName": "Escalation_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1644593358"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        -192
+      ],
+      "id": "d63930e8-73ab-4d9d-8fe6-03674c13c3c2",
+      "name": "Read Escalation Records for Audit",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const records = $input.all();\n\nconst seen = new Set();\nconst issues = [];\n\nfor (const item of records) {\n  const alert = item.json;\n\n  const alertId = String(alert.Alert_ID || \"\").trim();\n\n  if (!alertId) {\n    issues.push({\n      json: {\n        Issue_Type: \"MISSING_ALERT_ID\",\n        Cycle_ID: alert.Cycle_ID || \"\",\n        Details: \"Escalation record has no Alert_ID\"\n      }\n    });\n    continue;\n  }\n\n  if (seen.has(alertId)) {\n    issues.push({\n      json: {\n        Issue_Type: \"DUPLICATE_ESCALATION_ALERT\",\n        Alert_ID: alertId,\n        Cycle_ID: alert.Cycle_ID,\n        Task_ID: alert.Task_ID,\n        Employee: alert.Employee,\n        Details: \"This Alert_ID appears more than once\"\n      }\n    });\n  } else {\n    seen.add(alertId);\n  }\n}\n\nreturn issues;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -192
+      ],
+      "id": "bb10a91c-2c3d-435b-a7fd-0a88930a4bad",
+      "name": "Detect Duplicate Escalation Alerts",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = $(\"Read Task Cycles for Integrity Audit\").all();\n\nconst issues = [];\n\nfor (const item of tasks) {\n  const task = item.json;\n\n  if (\n    String(task.Status || \"\").trim().toLowerCase() !== \"completed\"\n  ) {\n    continue;\n  }\n\n  const taskId = String(task.Task_ID || \"\").trim();\n\n  if (taskId === \"TSK001\") {\n    if (!String(task.Completion_Proof || \"\").trim()) {\n      issues.push({\n        json: {\n          Issue_Type: \"MISSING_COMPLETION_PROOF\",\n          Cycle_ID: task.Cycle_ID,\n          Task_ID: taskId,\n          Employee: task.Assigned_To,\n          Details: \"Daily WhatsApp completion proof is missing\"\n        }\n      });\n    }\n  } else if (\n    !String(task.Ticket_ID || \"\").trim()\n  ) {\n    issues.push({\n      json: {\n        Issue_Type: \"MISSING_TICKET_ID\",\n        Cycle_ID: task.Cycle_ID,\n        Task_ID: taskId,\n        Employee: task.Assigned_To,\n        Details: \"Completed portal task has no Ticket ID\"\n      }\n    });\n  }\n}\n\nreturn issues;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2336,
+        -192
+      ],
+      "id": "3d30b68b-0192-45b8-9faa-17476552dfe8",
+      "name": "Validate Required Completion Proof",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cycles = $(\"Read Task Cycles for Integrity Audit\").all();\nconst completions = $(\"Read Completion Records for Audit\").all();\nconst alerts = $(\"Read Escalation Records for Audit\").all();\n\nconst cycleIds = cycles\n  .map(x => String(x.json.Cycle_ID || \"\").trim())\n  .filter(Boolean);\n\nconst completionIds = completions\n  .map(x => String(x.json.Cycle_ID || \"\").trim())\n  .filter(Boolean);\n\nconst alertIds = alerts\n  .map(x => String(x.json.Alert_ID || \"\").trim())\n  .filter(Boolean);\n\nconst countDuplicates = values =>\n  values.length - new Set(values).size;\n\nreturn [{\n  json: {\n    Audit_Date: new Date().toISOString(),\n    Task_Cycle_Records: cycles.length,\n    Duplicate_Task_Cycles: countDuplicates(cycleIds),\n    Completion_Records: completions.length,\n    Duplicate_Completions: countDuplicates(completionIds),\n    Escalation_Records: alerts.length,\n    Duplicate_Escalation_Alerts: countDuplicates(alertIds),\n    Acknowledged_Alerts: alerts.filter(\n      x => String(x.json.Manager_Acknowledged).toLowerCase() === \"true\"\n    ).length,\n    Leadership_Escalated_Alerts: alerts.filter(\n      x => String(x.json.Leadership_Escalated).toLowerCase() === \"true\"\n    ).length,\n    Audit_Result: \"COMPLETED\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        -192
+      ],
+      "id": "3fc70b08-e726-427b-bd26-f02757d2f9b4",
+      "name": "Generate Operational Integrity Summary"
+    },
+    {
+      "parameters": {
+        "content": "## **Daily Integrity Audit Schedule**\n\n**Purpose:** Starts the daily operational integrity audit.\n\n**Trigger:** Daily at 9:00 AM (Asia/Kolkata).\n\n**Action:** Initiates validation of operational records.",
+        "height": 416,
+        "width": 288,
+        "color": "#A69DEC"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -512,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "053219f9-da29-4aae-b667-286f5d71b34c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Task Cycles for Integrity Audit**\n\n**Purpose:** Retrieves employee task-cycle records.\n\n**Data Source:** Google Sheets – Employee_Workbench.\n\n**Action:** Reads task cycles for integrity validation.",
+        "height": 416,
+        "width": 288,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "ba1ae8f1-4fb6-43a1-bdcb-fd84af85b4fb",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## **Detect Duplicate Task Cycles**\n\n**Purpose:** Identifies duplicate or missing task-cycle records.\n\n**Validation:** Checks Cycle_ID values.\n\n**Output:** Duplicate task-cycle details.",
+        "height": 416,
+        "width": 288,
+        "color": "#FFA3D4"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        208,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "4a28f802-c4aa-4276-b255-3996019366e5",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Completion Records for Audit**\n\n**Purpose:** Retrieves employee completion records.\n\n**Data Source:** Google Sheets – Completion_Log.\n\n**Action:** Reads records for completion validation.",
+        "height": 416,
+        "width": 288,
+        "color": "#3F8992"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        592,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "c003b2df-de8e-4bff-a45d-fd9a9e8cdc0d",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## **Detect Duplicate Completion Records**\n\n**Purpose:** Identifies duplicate completion entries.\n\n**Validation:** Checks completion records using Cycle_ID.\n\n**Output:** Duplicate completion details.",
+        "height": 416,
+        "width": 288,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1024,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "bddd262f-3491-4036-be54-27ed917bae34",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## **Read Escalation Records for Audit**\n\n**Purpose:** Retrieves manager and leadership alert records.\n\n**Data Source:** Google Sheets – Escalation_Log.\n\n**Action:** Reads escalation records for validation.",
+        "height": 416,
+        "width": 288,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "78f1695f-b3c8-45f2-968f-d9976eacaee0",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## **Detect Duplicate Escalation Alerts**\n\n**Purpose:** Identifies duplicate or missing escalation alerts.\n\n**Validation:** Checks Alert_ID values.\n\n**Output:** Duplicate escalation details.",
+        "height": 416,
+        "width": 288,
+        "color": "#DB8484"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1776,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "a3d1981b-148e-4def-9176-c738406dfc91",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## **Validate Required Completion Proof**\n\n**Purpose:** Verifies required evidence for completed tasks.\n\n**Validation:** Checks WhatsApp proof for daily tasks.\n\n**Validation:** Checks Ticket ID for portal tasks.\n\n**Output:** Completion proof validation results.",
+        "height": 416,
+        "width": 400,
+        "color": "#64B492"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2240,
+        -400
+      ],
+      "typeVersion": 1,
+      "id": "8dfc766c-db0a-4c44-89c2-249f07ca854d",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "## **Generate Operational Integrity Summary**\n\n**Purpose:** Generates the final operational audit summary.\n\n**Metrics:** Task cycles, completions, escalations, and duplicates.\n\n**Action:** Summarizes acknowledgement and leadership escalation records.\n\n**Output:** Final audit status.",
+        "height": 448,
+        "width": 400,
+        "color": "#A7D760"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2672,
+        -432
+      ],
+      "typeVersion": 1,
+      "id": "bf4d1a8f-df74-4117-8dba-9ce481b43abd",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 6 – Operational Integrity Audit**\n\n**Workflow Name:** AI Operations – 06 – Operational Integrity Audit\n\n**Purpose:** Automatically audits operational records to identify duplicate task cycles, duplicate completion records, duplicate escalation alerts, and missing completion proof.\n\n**Trigger:** Daily at 9:00 AM (Asia/Kolkata).\n\n**Data Source:** Google Sheets – Employee_Workbench, Completion_Log, and Escalation_Log.\n\n**Output:** Operational integrity summary with duplicate checks, proof validation, and final audit status.",
+        "height": 288,
+        "width": 1104,
+        "color": "#B01111"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        544,
+        -1040
+      ],
+      "typeVersion": 1,
+      "id": "659652ef-38dd-4cd8-a54e-b489883fa909",
+      "name": "Sticky Note9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Integrity Audit Schedule": {
+      "main": [
+        [
+          {
+            "node": "Read Task Cycles for Integrity Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Task Cycles for Integrity Audit": {
+      "main": [
+        [
+          {
+            "node": "Detect Duplicate Task Cycles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Duplicate Task Cycles": {
+      "main": [
+        [
+          {
+            "node": "Read Completion Records for Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Completion Records for Audit": {
+      "main": [
+        [
+          {
+            "node": "Detect Duplicate Completion Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Duplicate Completion Records": {
+      "main": [
+        [
+          {
+            "node": "Read Escalation Records for Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Escalation Records for Audit": {
+      "main": [
+        [
+          {
+            "node": "Detect Duplicate Escalation Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Duplicate Escalation Alerts": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Completion Proof",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Completion Proof": {
+      "main": [
+        [
+          {
+            "node": "Generate Operational Integrity Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "395a3319-a47e-4b1c-973c-ee69a27cba8e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "1nk4cbgNQWV7Jo6b",
+  "tags": []
+}

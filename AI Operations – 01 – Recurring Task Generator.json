@@ -1,0 +1,528 @@
+{
+  "name": "AI Operations – 01 – Recurring Task Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -96,
+        -544
+      ],
+      "id": "566e6431-e81b-4a58-9b14-9ed979152740",
+      "name": "Daily Schedule Trigger",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst records = $input.all();\n\n// Separate Task_Master records and existing task cycles\nconst tasks = records.filter(item => item.json.First_Due_Date);\nconst existingCycles = records.filter(item => item.json.Cycle_ID);\n\nconst results = [];\n\nfor (const item of tasks) {\n  const task = item.json;\n\n  if (task.Active !== true && String(task.Active).toLowerCase() !== \"true\") {\n    continue;\n  }\n\n  const frequency = Number(task.Frequency_Days);\n  const firstDue = new Date(`${task.First_Due_Date}T00:00:00Z`);\n\n  if (!Number.isFinite(frequency) || frequency < 1 || isNaN(firstDue.getTime())) {\n    continue;\n  }\n\n  const taskCycles = existingCycles\n    .map(x => x.json)\n    .filter(x => String(x.Task_ID).trim() === String(task.Task_ID).trim())\n    .sort((a, b) => String(b.Due_Date).localeCompare(String(a.Due_Date)));\n\n  let nextDue = new Date(firstDue);\n\n  if (taskCycles.length > 0) {\n    const latestCycle = taskCycles[0];\n\n    if (String(latestCycle.Status).trim().toLowerCase() !== \"completed\") {\n      continue;\n    }\n\n    nextDue = new Date(`${latestCycle.Due_Date}T00:00:00Z`);\n    nextDue.setUTCDate(nextDue.getUTCDate() + frequency);\n  }\n\n  const dueDate = nextDue.toISOString().slice(0, 10);\n\n  results.push({\n    json: {\n      Cycle_ID: `${task.Task_ID}-${dueDate.replaceAll(\"-\", \"\")}`,\n      Task_ID: task.Task_ID,\n      Task_Name: task.Task_Name,\n      Assigned_To: task.Assigned_To,\n      Employee_Email: task.Employee_Email,\n      Due_Date: dueDate,\n      Due_Time: task.Due_Time,\n      Status: \"Pending\",\n      Ticket_ID: \"\",\n      Completion_Proof: \"\",\n      Completed_By: \"\",\n      Completed_At: \"\",\n      Manager_Acknowledged: false,\n      Manager_Acknowledged_At: \"\",\n      Escalation_Level: \"None\",\n      Frequency_Days: frequency,\n      Task_Type: task.Task_Type,\n      Required_Proof: task.Required_Proof,\n      Manager_Email: task.Manager_Email,\n      Leadership_Email: task.Leadership_Email\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -528
+      ],
+      "id": "aa489b01-547e-4c02-9a81-1080b5f698ab",
+      "name": "Calculate Recurring Task Cycles"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        -112
+      ],
+      "id": "d1b082ac-4a21-4b19-98bc-c38d878fdd39",
+      "name": "Read Existing Task Cycles",
+      "alwaysOutputData": false,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Task_Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        -544
+      ],
+      "id": "6a61ea7a-6af0-4b2f-ae7c-cf143faa87fe",
+      "name": "Read Task Master",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst generatedTasks = $(\"Calculate Recurring Task Cycles\").all();\nconst existingRows = $(\"Read Existing Task Cycles\").all();\n\nconst existingCycleIds = new Set();\n\nconst pendingTaskIds = new Set();\n\nfor (const item of existingRows) {\n  const row = item.json;\n\n  const cycleId = String(row.Cycle_ID || \"\").trim();\n  const taskId = String(row.Task_ID || \"\").trim();\n  const status = String(row.Status || \"\").trim().toLowerCase();\n\n  if (cycleId) {\n    existingCycleIds.add(cycleId);\n  }\n\n  if (taskId && status === \"pending\") {\n    pendingTaskIds.add(taskId);\n  }\n}\n\nconst newTasks = generatedTasks.filter(item => {\n  const cycleId = String(item.json.Cycle_ID || \"\").trim();\n  const taskId = String(item.json.Task_ID || \"\").trim();\n\n  return (\n    cycleId &&\n    taskId &&\n    !existingCycleIds.has(cycleId) &&\n    !pendingTaskIds.has(taskId)\n  );\n});\n\nreturn newTasks;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -528
+      ],
+      "id": "235b30bb-fa4d-44b3-8408-ae513a3f00c0",
+      "name": "Filter Duplicate Task Cycles"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8",
+          "mode": "list",
+          "cachedResultName": "Allo Innoware – AI Operations Manager",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1358012017,
+          "mode": "list",
+          "cachedResultName": "Employee_Workbench",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1e_-xgw8cC1Q64SIbY9D_vzQtXwwEiOLuZ0Q2kb-Qdk8/edit#gid=1358012017"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Cycle_ID": "={{ $json.Cycle_ID }}",
+            "Task_ID": "={{ $json.Task_ID }}",
+            "Task_Name": "={{ $json.Task_Name }}",
+            "Assigned_To": "={{ $json.Assigned_To }}",
+            "Due_Date": "={{ $json.Due_Date }}",
+            "Due_Time": "={{ $json.Due_Time }}",
+            "Status": "={{ $json.Status }}",
+            "Ticket_ID": "={{ $json.Ticket_ID }}",
+            "Completion_Proof": "={{ $json.Completion_Proof }}",
+            "Completed_By": "={{ $json.Completed_By }}",
+            "Completed_At": "={{ $json.Completed_At }}",
+            "Manager_Acknowledged": "={{ $json.Manager_Acknowledged }}",
+            "Manager_Acknowledged_At": "={{ $json.Manager_Acknowledged_At }}",
+            "Escalation_Level": "={{ $json.Escalation_Level }}  "
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Cycle_ID",
+              "displayName": "Cycle_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_ID",
+              "displayName": "Task_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Task_Name",
+              "displayName": "Task_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Assigned_To",
+              "displayName": "Assigned_To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due_Date",
+              "displayName": "Due_Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due_Time",
+              "displayName": "Due_Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ticket_ID",
+              "displayName": "Ticket_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completion_Proof",
+              "displayName": "Completion_Proof",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completed_By",
+              "displayName": "Completed_By",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Completed_At",
+              "displayName": "Completed_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged",
+              "displayName": "Manager_Acknowledged",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Manager_Acknowledged_At",
+              "displayName": "Manager_Acknowledged_At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Escalation_Level",
+              "displayName": "Escalation_Level",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1888,
+        -528
+      ],
+      "id": "7bde86e4-49ab-46d9-9cc0-e4a46be32d09",
+      "name": "Create Employee Task Cycle",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "QBj6UguVHrUGbCwf",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        832,
+        -528
+      ],
+      "id": "70320d95-d17e-4d61-8aa3-551b7c06a711",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "content": "# **Workflow 1 – Recurring Task Generator**\n\n**Workflow Name:** AI Operations – 01 – Recurring Task Generator\n\n**Purpose:** Automatically creates recurring operational tasks based on task frequency and completion status.\n\n**Trigger:** Daily at 8:00 AM (Asia/Kolkata)\n\n**Data Source:** Google Sheets – Task_Master and Employee_Workbench\n\n**Output:** New recurring task records in Employee_Workbench.",
+        "height": 320,
+        "width": 672,
+        "color": "#6600FF"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        -1216
+      ],
+      "typeVersion": 1,
+      "id": "413316cf-273a-494d-bd81-422306662ee5",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Daily Schedule Trigger\n- Starts the workflow automatically every day.\n- Runs at 8:00 AM.\n- Uses Asia/Kolkata timezone.\n- Initiates recurring task generation.\n- Ensures tasks are created on schedule.",
+        "height": 352,
+        "width": 304,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -192,
+        -736
+      ],
+      "typeVersion": 1,
+      "id": "c5bd496e-268f-4896-ad87-a459876da34f",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Read Task Master\n- Reads task details from Google Sheets.\n- Retrieves employee assignments.\n- Checks task frequency and due dates.\n- Reads required proof and task type.\n- Processes only active tasks.",
+        "height": 352,
+        "width": 304,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        144,
+        -736
+      ],
+      "typeVersion": 1,
+      "id": "531e6572-05b9-45ca-9fe7-b124a12fd986",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Read Existing Task Cycles\n- Reads existing employee task records.\n- Checks completed and pending tasks.\n- Identifies the latest task cycle.\n- Helps prevent duplicate task creation.\n- Preserves previous task records.",
+        "height": 400,
+        "width": 304,
+        "color": "#20D599"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "4bc8932a-3111-431f-bd18-096c9ce2fee8",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Merge Task Records\n- Combines Task Master records.\n- Combines existing task-cycle records.\n- Uses Append mode.\n- Prepares combined data for processing.\n- Sends records to the calculation node.",
+        "height": 368,
+        "width": 304,
+        "color": "#D270AE"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        720,
+        -720
+      ],
+      "typeVersion": 1,
+      "id": "d2d5adad-433d-4f84-a071-41841c2c2fb8",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Calculate Recurring Task Cycles\n- Checks active task configurations.\n- Reads the task frequency.\n- Checks the latest task completion status.\n- Calculates the next due date.\n- Generates a unique Cycle ID.\n- Prepares new tasks with Pending status.",
+        "height": 416,
+        "width": 336,
+        "color": "#916FB3"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1056,
+        -768
+      ],
+      "typeVersion": 1,
+      "id": "9d15488a-8184-4471-b9b0-86ee739e1817",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Filter Duplicate Task Cycles\n- Checks existing Cycle IDs.\n- Identifies duplicate task records.\n- Skips tasks that are already Pending.\n- Allows only eligible new task cycles.\n- Prevents duplicate task creation.",
+        "height": 400,
+        "width": 288
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1440,
+        -752
+      ],
+      "typeVersion": 1,
+      "id": "72a556f3-cc75-4bf3-a312-5b3e332c899c",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## Create Employee Task Cycle\n- Adds new task records to Google Sheets.\n- Updates the Employee_Workbench sheet.\n- Assigns tasks to the correct employees.\n- Sets the initial status to Pending.\n- Stores the next task due date.\n- Makes new tasks available to employees.",
+        "height": 416,
+        "width": 352,
+        "color": "#B7D369"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1776,
+        -752
+      ],
+      "typeVersion": 1,
+      "id": "eb6d8586-2d5c-476d-abad-26df74e2d437",
+      "name": "Sticky Note7"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Task Master",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Recurring Task Cycles": {
+      "main": [
+        [
+          {
+            "node": "Filter Duplicate Task Cycles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Task Master": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Existing Task Cycles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Existing Task Cycles": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Filter Duplicate Task Cycles": {
+      "main": [
+        [
+          {
+            "node": "Create Employee Task Cycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Calculate Recurring Task Cycles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "27711109-67e0-420d-b146-34d8b95676f6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "308348c02f90cc437c180efde0b6d3818cc993128a734b5c19993d2804054b58"
+  },
+  "nodeGroups": [],
+  "id": "9yUZvXHlsUdIxJqR",
+  "tags": []
+}
